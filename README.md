@@ -52,5 +52,8 @@ NOTE: You might need to use `sudo` for the last command.
 - The central saves the 3 axis magneto sensor data graphs into a mp4 video.
 - When the button state hasn't been updated (the peripheral hasn't notified the central), the central only prints out the heart rate data.
 
+
+https://user-images.githubusercontent.com/62509673/200023816-f999569d-979f-43eb-979e-b8ba35281b6d.mp4
+
 <img src=docs/figure_result2.png height="500"/>
 <img src=docs/figure_result.png height="400"/>
