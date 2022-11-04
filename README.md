@@ -4,7 +4,7 @@ This codebase contains 2 parts that can be found in the `central` folder and the
 
 The peripheral folder contains the code and config files for the STM32 IoT node. The program can be built using Mbed Studio. The functionality for the peripheral is sending data to the RPi (central) via bluetooth.
 
-The central folder contains the code for RPi. The program scans for the peripheral named `IOT32` and prints out the data recieved from the peripheral.
+The central folder contains the code for RPi. The program scans for the peripheral named `IOT32` and prints out the data recieved from the peripheral. It also saves the 3axis magneto values into a mp4.
 
 ## Team member:
 b09901052 劉承亞
@@ -49,6 +49,8 @@ NOTE: You might need to use `sudo` for the last command.
 
 ## Features
 - The central prints out the recieved data whenever there is a value changed.
+- The central saves the 3 axis magneto sensor data graphs into a mp4 video.
 - When the button state hasn't been updated (the peripheral hasn't notified the central), the central only prints out the heart rate data.
 
+<img src=docs/figure_result2.png height="500"/>
 <img src=docs/figure_result.png height="400"/>
