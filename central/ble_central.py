@@ -3,24 +3,28 @@ from bluepy.btle import Peripheral, UUID
 from bluepy.btle import Scanner, DefaultDelegate
 import time
 import threading
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 
 HEART_RATE_INDEX = 0
 BUTTON_STATE_INDEX = 1
-MAG_STATE_INDEX = 2
-HEART_RATE_BODY_LOCATION_INDEX = 3
+MAG_STATE_X_INDEX = 2
+MAG_STATE_Y_INDEX = 3
+MAG_STATE_Z_INDEX = 4
+HEART_RATE_BODY_LOCATION_INDEX = 5
 
 BODY_LOCATION = ["OTHER", "CHEST", "WRIST", "FINGER", "HAND", "EAR_LOBE", "FOOT"]
 
-chUUIDs = [0x2a37, 0xa001, 0x0000, 0x2a38]  # TODO:
-chHandles = [-1, -1, -1, -1]
+chUUIDs = [0x2a37, 0xa001, 0xa003, 0xa004, 0xa005, 0x2a38]
+chHandles = [-1, -1, -1, -1, -1, -1]
 
-data = [-1, -1, -1, -1]
+data = [-1, -1, -1, -1, -1, -1]
 flagDataChange = True 
 
 HEARTRATE_SERVICE_UUID = 0x180D
 BUTTON_SERVICE_UUID = 0xA000
-MAG_SERVICE_UUID = 0x0000 # TODO
+MAG_SERVICE_UUID = 0xA002
 serviceList = [HEARTRATE_SERVICE_UUID, BUTTON_SERVICE_UUID, MAG_SERVICE_UUID]
 
 class ScanDelegate(DefaultDelegate):
@@ -32,9 +36,14 @@ class ScanDelegate(DefaultDelegate):
         elif isNewData:
             print ("Received new data from", dev.addr)
     def handleNotification(self, cHandle, _data):
-        global flagDataChange
-        for idx in [HEART_RATE_INDEX, BUTTON_STATE_INDEX, MAG_STATE_INDEX]:
+        global flagDataChange, data
+        for idx in [HEART_RATE_INDEX, BUTTON_STATE_INDEX]:
             newData = int.from_bytes(_data, "big")
+            if cHandle == chHandles[idx] and data[idx] != newData: 
+               flagDataChange = True
+               data[idx] = newData
+        for idx in [MAG_STATE_X_INDEX, MAG_STATE_Y_INDEX, MAG_STATE_Z_INDEX]:
+            newData = int.from_bytes(_data, "little", signed=True)
             if cHandle == chHandles[idx] and data[idx] != newData: 
                flagDataChange = True
                data[idx] = newData
@@ -43,14 +52,19 @@ class ScanDelegate(DefaultDelegate):
                 print("heart rate data", data[HEART_RATE_INDEX])
             if data[BUTTON_STATE_INDEX] != -1:
                 print("button data", data[BUTTON_STATE_INDEX])
-            if data[MAG_STATE_INDEX] != -1:
-                print("mag data", data[MAG_STATE_INDEX])
+            if data[MAG_STATE_X_INDEX] != -1:
+                print("mag X data", data[MAG_STATE_X_INDEX])
+            if data[MAG_STATE_Y_INDEX] != -1:
+                print("mag Y data", data[MAG_STATE_Y_INDEX])
+            if data[MAG_STATE_Z_INDEX] != -1:
+                print("mag Z data", data[MAG_STATE_Z_INDEX])
             print("--------------------")
             flagDataChange = False
 
 
 class NotificationThread(threading.Thread):
     def __init__(self):
+        super(NotificationThread, self).__init__()
         self._stop_flag = threading.Event()
  
     def stop(self):
@@ -62,7 +76,7 @@ class NotificationThread(threading.Thread):
     def run(self):
         global dev
         while self.active():
-            if dev.waitForNotifications(1.0):
+            if dev.waitForNotifications(1.5):
                 # handleNotification() was called
                 continue
             
@@ -71,19 +85,16 @@ def animate(i, xs:list, ys:list):
     # Set up x-axis as time axis
     xs.append(time.time()*1000 - start_ms)
     xs = xs[-100:]
-
+    global data
     # Draw all data
-    k_values = list(data[-1].items())
+    k_values = data[2:5]
     for i in range(3):
-        (k, v) = k_values[i]
-        ys[i].append(v)
+        ys[i].append(k_values[i])
         ys[i] = ys[i][-100:]
         # Plot
-        ax = axs[i//3, i%3]
+        ax = axs[i]
         ax.clear()
-        ax.set_title(k)
         ax.set_xlabel('time(ms)')
-        ax.set_ylabel(k)
         ax.plot(xs, ys[i])
 
 scanner = Scanner().withDelegate(ScanDelegate())
@@ -115,7 +126,6 @@ for svc in dev.services:
     print(svc.uuid)
 
 
-
 try:
     for serviceUUID in serviceList:
         service = dev.getServiceByUUID(UUID(serviceUUID)) 
@@ -135,9 +145,15 @@ try:
                 print("button ch handle:", ch.valHandle) 
                 chHandles[BUTTON_STATE_INDEX]= ch.valHandle
 
-            if ch.uuid == UUID(chUUIDs[MAG_STATE_INDEX]):
-                print("button ch handle:", ch.valHandle) 
-                chHandles[MAG_STATE_INDEX]= ch.valHandle
+            if ch.uuid == UUID(chUUIDs[MAG_STATE_X_INDEX]):
+                print("mag X ch handle:", ch.valHandle) 
+                chHandles[MAG_STATE_X_INDEX]= ch.valHandle
+            if ch.uuid == UUID(chUUIDs[MAG_STATE_Y_INDEX]):
+                print("mag X ch handle:", ch.valHandle) 
+                chHandles[MAG_STATE_Y_INDEX]= ch.valHandle
+            if ch.uuid == UUID(chUUIDs[MAG_STATE_Z_INDEX]):
+                print("mag X ch handle:", ch.valHandle) 
+                chHandles[MAG_STATE_Z_INDEX]= ch.valHandle
             print("====================")
 
 except Exception as e:
@@ -148,19 +164,17 @@ except Exception as e:
 notification_thread = NotificationThread()
 notification_thread.start()
 
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 # Set up animation
 time_axis = []
 ys = [[] for _ in range(3)]
 fig, axs = plt.subplots(1, 3)
 start_ms = time.time()*1000
 fig.tight_layout(pad=4.0)
+f = "./result_animation.mp4" 
 
-f = r"./result_animation.mp4" 
+
 ani = animation.FuncAnimation(fig, animate, fargs=(time_axis, ys), interval=100)
-video = ani.FFMpegWriter(fps=60)
-ani.save(f, writer=video)
+ani.save(f)
 
 notification_thread.stop()
 notification_thread.join()
